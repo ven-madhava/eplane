@@ -429,6 +429,9 @@ def cash_flow(r_in):
 # function that is self explanatory with inline comments
 # ------------------------------------------------------
 
+# function that is self explanatory with inline comments
+# ------------------------------------------------------
+
 def shortest_path(n, origin_node):
     
     '''
@@ -442,7 +445,9 @@ def shortest_path(n, origin_node):
     # 0. inits
     # --------
     shortest = {}
+    shortest_parents = {}
     parents = {}
+    parents_path = {}
     counter = 0
 
     # 0.1 need for while condition
@@ -461,6 +466,7 @@ def shortest_path(n, origin_node):
     for each in n:
         if each[0] == origin_node:
             parents[each[1]] = each[2]
+            parents_path[each[1]] = each[0]
 
     # 2. sorting by smaller value first
     # ---------------------------------
@@ -487,12 +493,15 @@ def shortest_path(n, origin_node):
         # -----------------------------------------------
         f_node = list(parents.keys())[0]
         f_value = parents[f_node]
+        f_parent = parents_path[f_node]
 
         # 2. move f_node to shortest if it NOT present
         # ideally shouldnt be here
         # --------------------------------------------
         if f_node not in list(shortest.keys()):
             shortest[f_node] = f_value
+            shortest_parents[f_node] = f_parent
+            
 
         # 3. find immediate children of f_node and add to parents with UPDATED values
         # and ensure to keep the smaller one on parents
@@ -519,6 +528,7 @@ def shortest_path(n, origin_node):
                     # -----------------------------------------------------
                     if parents[child_node] > child_value:
                         parents[child_node] = child_value
+                        parents_path[child_node] = each[0]
 
                 else:
 
@@ -527,18 +537,64 @@ def shortest_path(n, origin_node):
                     # -------------------------
                     if child_node not in list(shortest.keys()):
                         parents[child_node] = child_value
+                        parents_path[child_node] = each[0]
 
         # 4. an update to parents
         # -----------------------
         del parents[f_node]
+        del parents_path[f_node]
         parents = dict(sorted(parents.items(), key=lambda item: item[1]))
     
     
+    # 3. using shortest parents dict to build decorative shortest path
+    # iter through each of the keys in the shortest path and work backwards to build paths
+    # ------------------------------------------------------------------------------------
+    #print(shortest_parents)
+    #print('printing route')
+    final_path_dict = {}
+    for curr_node in shortest_parents:
+        
+        # 0. local inits
+        # --------------
+        
+        curr_node_for_dict = curr_node
+        route = [curr_node]
+        while_break_flag = 0
+
+        # 1. loop through each parent until origin is arrived
+        # ---------------------------------------------------
+        while True:
+
+            # iter
+            # ----
+            for keys in shortest_parents:
+                if keys == curr_node:
+                    route.append(shortest_parents[keys])
+                    curr_node = shortest_parents[keys]
+
+                    # break if found origin
+                    # ---------------------
+                    if shortest_parents[keys] == origin_node:
+                        while_break_flag = 1
+
+            # break check
+            # -----------
+            if while_break_flag == 1:
+                break
+
+        
+        # adding to final out dict
+        # ------------------------
+        final_path_dict[curr_node_for_dict] = list(reversed(route))
+
     
     # 3. final return
     # ---------------
-    print(shortest)
-    #return shortest
+    #print(shortest)
+    #print(shortest_parents)
+    print(final_path_dict)
+    
+    
 
 
 # ### helper funtions
