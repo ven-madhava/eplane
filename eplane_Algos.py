@@ -594,7 +594,83 @@ def shortest_path(n, origin_node):
     #print(shortest_parents)
     print(final_path_dict)
     
+
+# 3. 
+
+# Find the maximum number of monsters the kids will be able to kill.
+# ------------------------------------------------------------------
+
+def monster_max(a,k_in):
     
+    '''
+    
+    # A monster can be killed by a kid's gun if and only if the power of monster is
+    # divisible by the gun's power.
+    # Find the maximum number of monsters the kids will be able to kill.
+    # just iter thru multiples of values in a between a[i] and max(k)
+
+    -- a is a list such as [2,1,22,4] - that indicates the powers of the kids
+    -- k_in is the number of monsters
+    
+    '''
+    
+    # 0. inits
+    # --------
+    k = list(range(1,k_in+1))
+    max_k = 0
+    
+    # 1. simple iter
+    # --------------
+    for each_a in a:
+
+        # 1.
+        # local inits
+        # -----------
+        items_to_remove = []
+
+
+        # 2.
+        # if else ops
+        # -----------
+        if each_a not in k:
+
+            # pass here
+            # ---------
+            pass
+
+        else:
+
+            # 1. 
+            # no of times to check values in k
+            # -----------------------------------
+            no_iters = max(k)//each_a
+
+            # 2.
+            # itering through no_iters
+            # ------------------------
+            for mul_i in range(1,no_iters + 1):
+
+                # check if multiple in list
+                # -------------------------
+                if each_a * mul_i in k:
+
+                    # means theres a multiple of each_a here
+                    # --------------------------------------
+                    max_k += 1
+                    items_to_remove.append(each_a * mul_i)
+
+
+            # 3. update current list k
+            # -------------------------
+            k = list(sorted([each for each in k if each not in items_to_remove]))
+    
+    
+    # 2. print max
+    # ------------
+    print(max_k)
+
+
+
 
 
 # ### helper funtions
@@ -604,14 +680,17 @@ def shortest_path(n, origin_node):
 
 # simple wrapper
 # --------------
-def main_wrapper(task, input_in, origin_in):
+def main_wrapper(task, input_in, origin_in, k_in):
     
     # simple if else
     # --------------
     if task == 'flow':
         cash_flow(input_in)
-    else:
+    elif task == 'path':
         shortest_path(input_in, origin_in)
+    else:
+        monster_max(input_in, int(k_in))
+
         
 
 
@@ -624,12 +703,18 @@ def assert_args(args_in):
 
     # 0. make sure these are inline
     # -----------------------------
-    assert args_in.task == 'flow' or args_in.task == 'path', 'Task Input Error: Task has to be flow or path'
-    list_input = list(eval(str(args_in.input)))
+    assert args_in.task == 'flow' or args_in.task == 'path' or args_in.task == 'monster', 'Task Input Error: Task has to be flow, path or monster only.'
+
+    # set list input accordingly
+    # --------------------------
+    if args_in.task == 'monster':
+        list_input = list(eval(str(args_in.kids_power)))
+    else:
+        list_input = list(eval(str(args_in.input)))
 
     # 1. all good - next steps
     # ------------------------
-    main_wrapper(args_in.task,list_input,args_in.origin_node)
+    main_wrapper(args_in.task,list_input,args_in.origin_node,args_in.num_monsters)
 
 
 # In[6]:
@@ -645,10 +730,16 @@ parser = argparse.ArgumentParser()
 
 # 2. add argumenst to parser
 # --------------------------
-parser.add_argument('-t', '--task', help="Enter task to peform - 'flow': Minimize value flow between people, 'path': Shortest path from origin")
-parser.add_argument('-i', '--input', help="Enter input for task. Both task follow the same format - relation is a list of lists in format [giver/from_node, taker_to_node, value/edge_weight] [...] [...] - example '['a','b',4], ['a','j',1]' -- PLEASE PASS THIS AS A STRING.")
+parser.add_argument('-t', '--task', help="Enter task to peform - 'flow': Minimize value flow between people, 'path': Shortest path from origin, 'monster': Find the maximum number of monsters the kids will be able to kill.")
+parser.add_argument('-i', '--input', help="For both tasks 'flow' and 'path' follow the same format - relation is a list of lists in format [giver/from_node, taker_to_node, value/edge_weight] [...] [...] - example '['a','b',4], ['a','j',1]' -- PLEASE PASS THIS AS A STRING.")
 parser.add_argument('-o', '--origin_node', help="Enter origin node for the shortest path task. Make sure origin is connected to all other nodes.")
+
+parser.add_argument('-a', '--kids_power', help="For task 'monster', this input is a list of powers of kids guns. Example - '[2,12,4,22]' ")
+parser.add_argument('-k', '--num_monsters', help="The number of monsters awaiting the kids.")
+
 # more args
+
+# 
 
 # 3. parse arguments
 # The arguments are parsed with parse_args(). 
