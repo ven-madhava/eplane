@@ -97,6 +97,31 @@ def process_image(task, img):
         # ------------
         return overlayed_image
     
+    elif task == 'depth':
+
+        # return_perception(img_in_BGR, model)
+        # use the abve function
+
+        # 1. loading seg model
+        # --------------------
+        try:
+            model_path = os.getcwd() + '/models/'
+            base_name = 'eplane_depth_perception'
+            model_dep = load_saved_model_function_cpu(model_path + base_name + '.tar')
+            model_dep = model_dep.eval()
+        except:
+            assert 1==2,'Error: cannot find model to run! Please check if model is in path /models/'
+            model_dep = None
+        
+    
+        # 2. calling funtion
+        # ------------------
+        depth_image = return_perception(img, model_dep)
+        
+        # final return
+        # ------------
+        return depth_image
+
     
     else:
         
@@ -533,7 +558,6 @@ def return_faces_in_image_opencv_dnn(img, model_mask):
 
 # function return street view segmentation
 # ----------------------------------------
-
 def return_streetview_segmentation(img_in, model):
     
     '''
@@ -548,7 +572,7 @@ def return_streetview_segmentation(img_in, model):
     # ---------
     orig_h, orig_w = img_in.shape[0], img_in.shape[1]
     h,w = 255, 255
-    img = cv2.cvtColor(img_in, cv2.COLOR_BGR2RGB)
+    #img = cv2.cvtColor(img_in, cv2.COLOR_BGR2RGB) # not required as input is RGB
     img = cv2.resize(img_in, (w, h))
     img = img.reshape(1,h,w,3)
     
@@ -573,6 +597,62 @@ def return_streetview_segmentation(img_in, model):
     # -------------------
     return overlayed.astype('uint8')
 
+    
+# depth perception
+# ----------------
+# function to return depth perception
+# -----------------------------------
+# function to return depth perception
+# -----------------------------------
+
+def return_perception(img_in, model):
+    
+    '''
+    
+    1. simple forward pass and regress depth
+    2. still not sure how to perceive this here
+    
+    '''
+    
+    # 0. inits
+    # ---------
+    orig_h, orig_w = img_in.shape[0], img_in.shape[1]
+    h,w = 255, 255
+    img = cv2.resize(img_in, (w, h))
+    img = img.reshape(1,h,w,3)
+    img_trn = Variable(setup_image_tensor(img)).float()
+    img_trn = img_trn/torch.max(img_trn)
+    
+    # 1. forward pass
+    # ---------------
+    model_out = model.eval()(img_trn)
+    
+    # 2. simple np ops
+    # ----------------
+    model_out_np = to_numpy_image(model_out)
+    model_out_np = model_out_np[0]
+    
+    # 3. heatmap ops
+    # normalise & ops
+    # --------------
+    model_out_np = model_out_np/np.max(model_out_np)
+    model_out_np = (model_out_np * 255).astype('uint8')
+    model_out_np = cv2.applyColorMap(model_out_np, cv2.COLORMAP_HSV)
+    model_out_np = cv2.cvtColor(model_out_np, cv2.COLOR_BGR2RGB) 
+    model_out_np = cv2.resize(model_out_np, (orig_w, orig_h))
+
+    # overlay
+    # -------
+    overlay = (img_in.astype('uint8') * 0.5  + model_out_np * 0.5).astype('uint8')
+
+
+    # 4. return
+    # return image is RGB
+    # -------------------
+    return overlay
+
+
+    
     
 
 
@@ -904,8 +984,393 @@ class fcn_UNET_segmentation(nn.Module):
         # final return
         # ------------
         return up7_out
+
+
+# depth perceptionrelated
+# -----------------------
+# FCN class copied from image search notebook which worked
+# generator_1_127 latent_dim, line_in_channels, design_in_channels, out_channels return_encoded_latents
+# --------------------------------------------------------
+
+# 1.
+# FCN 1x1
+# --------
+class fcn_UNET_depthperception(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+        # AIMING FOR THIS TO BE A FCNs
+        ##############################
+        # generator with RELU and discrimitor with leaky relu
+        
+         # Initialising N/W here
+        # ---------------------
+        nw_activation_conv = nn.LeakyReLU(0.2) #nn.LeakyReLU(0.2) #nn.ReLU() # nn.ReLU() #nn.ReLU() #nn.LeakyReLU(0.2) # nn.Tanh() nn.Softmax2d()
+        f = 3
+        s = 2
+        dropout_prob = 0.1
+        dropout_node = nn.Dropout2d(p=dropout_prob)
+        self.main_latent_dim = 128
+
+        # 1. image encoder
+        # ----------------
+        # 00.
+        ####
+        conv00_ch = 32
+        ct00 = nn.Conv2d(3,conv00_ch,f,stride = s)
+        cb00 = nn.BatchNorm2d(conv00_ch)
+        ca00 = nw_activation_conv
+        self.cl00 = nn.Sequential(*[ct00,cb00,ca00,dropout_node])
+        # 127
+
+        # 0.
+        ####
+        conv0_ch = 32
+        ct0 = nn.Conv2d(conv00_ch,conv0_ch,f,stride = s)
+        cb0 = nn.BatchNorm2d(conv0_ch)
+        ca0 = nw_activation_conv
+        self.cl0 = nn.Sequential(*[ct0,cb0,ca0,dropout_node])
+        # 63
+        
+        # 1.
+        ####
+        conv1_ch = 64
+        ct1 = nn.Conv2d(conv0_ch,conv1_ch,f,stride = s)
+        cb1 = nn.BatchNorm2d(conv1_ch)
+        ca1 = nw_activation_conv
+        self.cl1 = nn.Sequential(*[ct1,cb1,ca1,dropout_node])
+        # 31
+        
+        # 2.
+        ####
+        conv2_ch = 128
+        ct2 = nn.Conv2d(conv1_ch,conv2_ch,f,stride = s)
+        cb2 = nn.BatchNorm2d(conv2_ch)
+        ca2 = nw_activation_conv
+        self.cl2 = nn.Sequential(*[ct2,cb2,ca2,dropout_node])
+        # 15
+        
+        # 3.
+        ####
+        conv3_ch = 256
+        ct3 = nn.Conv2d(conv2_ch,conv3_ch,f,stride = s)
+        cb3 = nn.BatchNorm2d(conv3_ch)
+        ca3 = nw_activation_conv
+        self.cl3 = nn.Sequential(*[ct3,cb3,ca3,dropout_node])
+        # 7
+        
+        # 4.
+        ####
+        conv4_ch = 512
+        ct4 = nn.Conv2d(conv3_ch,conv4_ch,f,stride = s)
+        cb4 = nn.BatchNorm2d(conv4_ch)
+        ca4 = nw_activation_conv
+        self.cl4 = nn.Sequential(*[ct4,cb4,ca4,dropout_node])
+        # 3
+
+        # 5.
+        ####
+        ct5 = nn.Conv2d(conv4_ch,self.main_latent_dim,f,stride = s)
+        ca5 = nw_activation_conv
+        self.cl5 = nn.Sequential(*[ct5,ca5,dropout_node])
+        # 1
+
+
+        #################################################
+        #################################################
+        #################################################
+
+        # GETTING INTO UPCONS
+        # -------------------
+        # Upconv layer 1
+        ###
+        t1 = nn.ConvTranspose2d(self.main_latent_dim,conv4_ch,f,stride = s)
+        b1 = nn.BatchNorm2d(conv4_ch)
+        a1 = nw_activation_conv
+        self.ul1 = nn.Sequential(*[t1,b1,a1,dropout_node])
+        # 3x3
+        
+        # Upconv layer 2
+        ###
+        t2 = nn.ConvTranspose2d(conv4_ch*2,conv3_ch,f,stride = s)
+        b2 = nn.BatchNorm2d(conv3_ch)
+        a2 = nw_activation_conv
+        self.ul2 = nn.Sequential(*[t2,b2,a2,dropout_node])
+        # 7
+        
+        # Upconv layer 3
+        ###
+        t3 = nn.ConvTranspose2d(conv3_ch*2,conv2_ch,f,stride = s)
+        b3 = nn.BatchNorm2d(conv2_ch)
+        a3 = nw_activation_conv
+        self.ul3 = nn.Sequential(*[t3,b3,a3,dropout_node])
+        # 15
+        
+        # Upconv layer 4
+        ###
+        t4 = nn.ConvTranspose2d(conv2_ch*2,conv1_ch,f,stride = s)
+        b4 = nn.BatchNorm2d(conv1_ch)
+        a4 = nw_activation_conv
+        self.ul4 = nn.Sequential(*[t4,b4,a4,dropout_node])
+        # 31
+        
+        # Upconv layer 5
+        ###
+        t5 = nn.ConvTranspose2d(conv1_ch*2,conv0_ch,f,stride = s)
+        b5 = nn.BatchNorm2d(conv0_ch)
+        a5 = nw_activation_conv
+        self.ul5 = nn.Sequential(*[t5,b5,a5,dropout_node])
+        # 63
+        
+        
+        # Upconv layer 6
+        ###
+        t6 = nn.ConvTranspose2d(conv0_ch*2,conv00_ch,f,stride = s)
+        b6 = nn.BatchNorm2d(conv00_ch)
+        a6 = nw_activation_conv
+        self.ul6 = nn.Sequential(*[t6,b6,a6,dropout_node])
+        # 63
+        
+
+        # Upconv layer 6
+        # the outputs would be logits
+        ###
+        t7 = nn.ConvTranspose2d(conv00_ch*2,conv00_ch,f,stride = s)
+        b7 = nn.BatchNorm2d(conv00_ch)
+        a7 = nw_activation_conv
+        t7_f = nn.ConvTranspose2d(conv00_ch,1,1,stride = 1)
+        self.ul7 = nn.Sequential(*[t7,b7,a7,t7_f,a7])
+        # 127
+
+       
+
+    def forward(self, x):
+        
+        # encoding
+        # --------
+        conv00_out = self.cl00(x)
+        conv0_out = self.cl0(conv00_out)
+        conv1_out = self.cl1(conv0_out)
+        conv2_out = self.cl2(conv1_out)
+        conv3_out = self.cl3(conv2_out)
+        conv4_out = self.cl4(conv3_out)
+        conv5_out = self.cl5(conv4_out)
+
+
+   
+        # straightforward outs
+        # --------------------
+        up1_out = self.ul1(conv5_out)
+        up2_out = self.ul2(torch.cat((up1_out, conv4_out), 1))
+        up3_out = self.ul3(torch.cat((up2_out, conv3_out), 1))
+        up4_out = self.ul4(torch.cat((up3_out, conv2_out), 1))
+        up5_out = self.ul5(torch.cat((up4_out, conv1_out), 1))
+        up6_out = self.ul6(torch.cat((up5_out, conv0_out), 1))
+        up7_out = self.ul7(torch.cat((up6_out, conv00_out), 1))
+        
+        # using torch.exp to expand model prediction
+        ##
+        final_out = torch.exp(up7_out)
+        
+        
+        # final return
+        # ------------
+        return final_out
+    
     
 
+# 2.
+# 15x15
+# -----
+# FCN class copied from image search notebook which worked
+# generator_1_127 latent_dim, line_in_channels, design_in_channels, out_channels return_encoded_latents
+# --------------------------------------------------------
+
+class fcn_UNET_depthperception_15(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+        # AIMING FOR THIS TO BE A FCNs
+        ##############################
+        # generator with RELU and discrimitor with leaky relu
+        
+         # Initialising N/W here
+        # ---------------------
+        nw_activation_conv = nn.LeakyReLU(0.2) #nn.LeakyReLU(0.2) #nn.ReLU() # nn.ReLU() #nn.ReLU() #nn.LeakyReLU(0.2) # nn.Tanh() nn.Softmax2d()
+        f = 3
+        s = 2
+        dropout_prob = 0.1
+        dropout_node = nn.Dropout2d(p=dropout_prob)
+        self.main_latent_dim = 128
+
+        # 1. image encoder
+        # ----------------
+        # 00.
+        ####
+        conv00_ch = 32
+        ct00 = nn.Conv2d(3,conv00_ch,f,stride = s)
+        cb00 = nn.BatchNorm2d(conv00_ch)
+        ca00 = nw_activation_conv
+        self.cl00 = nn.Sequential(*[ct00,cb00,ca00,dropout_node])
+        # 127
+
+        # 0.
+        ####
+        conv0_ch = 64
+        ct0 = nn.Conv2d(conv00_ch,conv0_ch,f,stride = s)
+        cb0 = nn.BatchNorm2d(conv0_ch)
+        ca0 = nw_activation_conv
+        self.cl0 = nn.Sequential(*[ct0,cb0,ca0,dropout_node])
+        # 63
+        
+        # 1.
+        ####
+        conv1_ch = 128
+        ct1 = nn.Conv2d(conv0_ch,conv1_ch,f,stride = s)
+        #cb1 = nn.BatchNorm2d(conv1_ch)
+        ca1 = nw_activation_conv
+        self.cl1 = nn.Sequential(*[ct1,ca1,dropout_node])
+        # 31
+        
+        # 2.
+        ####
+        conv2_ch = 256
+        ct2 = nn.Conv2d(conv1_ch,conv2_ch,f,stride = s)
+        cb2 = nn.BatchNorm2d(conv2_ch)
+        ca2 = nw_activation_conv
+        self.cl2 = nn.Sequential(*[ct2,cb2,ca2,dropout_node])
+        # 15
+        
+        # 3.
+        ####
+        #conv3_ch = 256
+        #ct3 = nn.Conv2d(conv2_ch,conv3_ch,f,stride = s)
+        #cb3 = nn.BatchNorm2d(conv3_ch)
+        #ca3 = nw_activation_conv
+        #self.cl3 = nn.Sequential(*[ct3,cb3,ca3,dropout_node])
+        # 7
+        
+        # 4.
+        ####
+        #conv4_ch = 512
+        #ct4 = nn.Conv2d(conv3_ch,conv4_ch,f,stride = s)
+        #cb4 = nn.BatchNorm2d(conv4_ch)
+        #ca4 = nw_activation_conv
+        #self.cl4 = nn.Sequential(*[ct4,cb4,ca4,dropout_node])
+        # 3
+
+        # 5.
+        ####
+        #ct5 = nn.Conv2d(conv4_ch,self.main_latent_dim,f,stride = s)
+        #ca5 = nw_activation_conv
+        #self.cl5 = nn.Sequential(*[ct5,ca5,dropout_node])
+        # 1
+
+
+        #################################################
+        #################################################
+        #################################################
+
+        # GETTING INTO UPCONS
+        # -------------------
+        # Upconv layer 1
+        ###
+        #t1 = nn.ConvTranspose2d(self.main_latent_dim,conv4_ch,f,stride = s)
+        #b1 = nn.BatchNorm2d(conv4_ch)
+        #a1 = nw_activation_conv
+        #self.ul1 = nn.Sequential(*[t1,b1,a1,dropout_node])
+        # 3x3
+        
+        # Upconv layer 2
+        ###
+        #t2 = nn.ConvTranspose2d(conv4_ch*2,conv3_ch,f,stride = s)
+        #b2 = nn.BatchNorm2d(conv3_ch)
+        #a2 = nw_activation_conv
+        #self.ul2 = nn.Sequential(*[t2,b2,a2,dropout_node])
+        # 7
+        
+        # Upconv layer 3
+        ###
+        #t3 = nn.ConvTranspose2d(conv3_ch*2,conv2_ch,f,stride = s)
+        #b3 = nn.BatchNorm2d(conv2_ch)
+        #a3 = nw_activation_conv
+        #self.ul3 = nn.Sequential(*[t3,b3,a3,dropout_node])
+        # 15
+        
+        # Upconv layer 4
+        ###
+        t4 = nn.ConvTranspose2d(conv2_ch,conv1_ch,f,stride = s)
+        b4 = nn.BatchNorm2d(conv1_ch)
+        a4 = nw_activation_conv
+        self.ul4 = nn.Sequential(*[t4,b4,a4,dropout_node])
+        # 31
+        
+        # Upconv layer 5
+        ###
+        t5 = nn.ConvTranspose2d(conv1_ch*2,conv0_ch,f,stride = s)
+        b5 = nn.BatchNorm2d(conv0_ch)
+        a5 = nw_activation_conv
+        self.ul5 = nn.Sequential(*[t5,b5,a5,dropout_node])
+        # 63
+        
+        
+        # Upconv layer 6
+        ###
+        t6 = nn.ConvTranspose2d(conv0_ch*2,conv00_ch,f,stride = s)
+        b6 = nn.BatchNorm2d(conv00_ch)
+        a6 = nw_activation_conv
+        self.ul6 = nn.Sequential(*[t6,b6,a6,dropout_node])
+        # 63
+        
+
+        # Upconv layer 6
+        # the outputs would be logits
+        ###
+        t7 = nn.ConvTranspose2d(conv00_ch*2,conv00_ch,f,stride = s)
+        b7 = nn.BatchNorm2d(conv00_ch)
+        a7 = nw_activation_conv
+        t7_f = nn.ConvTranspose2d(conv00_ch,1,1,stride = 1)
+        self.ul7 = nn.Sequential(*[t7,b7,a7,t7_f,a7])
+        # 127
+
+       
+
+    def forward(self, x):
+        
+        # encoding
+        # --------
+        conv00_out = self.cl00(x)
+        conv0_out = self.cl0(conv00_out)
+        conv1_out = self.cl1(conv0_out)
+        conv2_out = self.cl2(conv1_out)
+        #conv3_out = self.cl3(conv2_out)
+        #conv4_out = self.cl4(conv3_out)
+        #conv5_out = self.cl5(conv4_out)
+
+
+   
+        # straightforward outs
+        # --------------------
+        #up1_out = self.ul1(conv5_out)
+        #up2_out = self.ul2(torch.cat((up1_out, conv4_out), 1))
+        #up3_out = self.ul3(torch.cat((up2_out, conv3_out), 1))
+        up4_out = self.ul4(conv2_out)
+        up5_out = self.ul5(torch.cat((up4_out, conv1_out), 1))
+        up6_out = self.ul6(torch.cat((up5_out, conv0_out), 1))
+        up7_out = self.ul7(torch.cat((up6_out, conv00_out), 1))
+        
+        # using torch.exp to expand model prediction
+        ##
+        final_out = torch.exp(up7_out)
+        
+        
+        # final return
+        # ------------
+        return final_out
+    
+    
+   
+   
 # end of all code
 # DELETE AFTER THIS IN PY FILE
 # ############################

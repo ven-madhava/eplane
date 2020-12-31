@@ -49,7 +49,7 @@ def assert_args(args_in):
 
 	# 0. make sure these are inline
 	# -----------------------------
-	assert args_in.task == 'facemask' or args_in.task == 'seg', 'Task Input Error: Task has to be facemake or seg'
+	assert args_in.task == 'facemask' or args_in.task == 'seg' or args_in.task == 'depth', 'Task Input Error: Task has to be facemake, seg or depth'
 	assert args_in.input_mode == 'image' or args_in.input_mode == 'video', 'Input Mode Error: INput mode has to be image or video'
 
 	# 1. all good - next steps
@@ -72,7 +72,7 @@ parser = argparse.ArgumentParser()
 
 # 2. add argumenst to parser
 # --------------------------
-parser.add_argument('-t', '--task', help="Enter task to peform - 'facemask': Face mask or not classifiation, 'seg': Street image segmentation")
+parser.add_argument('-t', '--task', help="Enter task to peform - 'facemask': Face mask or not classifiation, 'seg': Street image segmentation, 'depth': Depth perception")
 parser.add_argument('-i', '--input_mode', help="Enter input mode - 'image' or 'video'")
 parser.add_argument('-f', '--file_url', help="Enter file url to perform to perform task on")
 # more args
